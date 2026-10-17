@@ -5,10 +5,10 @@
 > 环境：Mac（本机无 NVIDIA GPU，CPU 机制测试）
 > 系统：macOS
 > AI 占比 vs 人工占比：80:20
-> 任务项编号 4.1 + 4.2 + 4.3（Part 02 · 04 MHA / GQA，Part 02 · 20 FlashAttention / SDPA，Part 02 · INF-EXECUTION-DISPATCH）
-> 当前卡点：本机没有 NVIDIA GPU。4.2 的耗时和峰值显存、4.3 的 CUDA kernel 名都还没有本机实测。下面给出实验口径，以及没有实测时怎么区分三种情况。
+> 任务项编号 4.1 最小打卡（Part 02 · 04 MHA / GQA，Part 02 · 20 FlashAttention / SDPA）
+> 当前卡点：本机没有 CUDA，4.2 / 4.3 的 GPU 配对实验和 Profiler kernel 证据无法在这台机器上采集。
 
-学习来源：DataWhale 社区《大模型算法与系统教程》https://github.com/datawhalechina/llm-algo-leetcode ，对应 Part 02 · 04、Part 02 · 20 与 Part 02 · INF-EXECUTION-DISPATCH。
+学习来源：DataWhale 社区《大模型算法与系统教程》https://github.com/datawhalechina/llm-algo-leetcode ，对应 Part 02 · 04 与 Part 02 · 20。
 
 ## 1. MHA 与 GQA 的 KV cache 有什么区别？
 
@@ -57,43 +57,3 @@ FlashAttention 仍计算同一种稠密注意力，但按 token 块处理：一�
 测试输出见 `task1_test_output.txt`。
 
 ![机制测试通过](https://raw.githubusercontent.com/TobinZuo/llm-algo-leetcode-study/master/task1_test_pass.png)
-
-## 4.2 公平的 Attention 性能对比
-
-### 1. 怎样才算公平
-
-两条路径必须吃同一份 Q、K、V：同一个 device、dtype、形状、因果 mask 和随机种子。只改注意力怎么执行，显式物化分数矩阵是基线，SDPA 或 FlashAttention 内核是候选。batch、头数、头维度、序列长度档位事先定死。这里沿教程的机制实验口径：batch=1、8 个头、头维度 64、长度 512/1024/2048/4096，精度用 GPU 实际支持的 BF16 或 FP16。
-
-比速度之前先看数值。低精度允许舍入差，用固定的 atol、rtol 看输出是否接近，再看最大绝对误差和相对 L2。没通过这一关的结果不拿来谈加速。
-
-### 2. 预热、同步、耗时和峰值显存
-
-正式计时前先空跑若干次，把 kernel 加载、缓存和频率爬升排除掉。GPU 调用是异步的，CPU 侧的 `time.time()` 会在计算没做完时就返回。用 CUDA Event 包住每次调用，结束事件 `synchronize` 之后再读毫秒数。重复多次，记中位数和 P95，不拿单次最小值当结论。
-
-峰值显存每次测量前 `reset_peak_memory_stats`。看的是这一路自己的 `max_memory_allocated` 和 `max_memory_reserved`，两条路分开清零，避免前一路的峰值算到后一路头上。Profiler 再记实际算子名，用来确认 SDPA 走到了哪一个内核。
-
-本机是 Mac，没有 CUDA，所以上面这组延迟和峰值显存没有实测数字。
-
-### 3. 算子变快，请求为什么不一定同等变快
-
-一次请求的时间不只有注意力。预填充在序列很长时，分数矩阵的读写确实可能占大头，这时算子加速比较容易反映到首 token 时间上。解码时每个新词的 Query 长度是 1，注意力主要在读历史 KV；旁边还有前馈、词表投影、采样和调度。注意力内核即使快几倍，这些部分不动，整次请求就快不了那么多。
-
-序列很短时，分数矩阵本来就不大，分块内核的启动开销可能把收益吃掉。显存省下来以后，服务端可能加大 batch，吞吐上去了，单条请求的延迟却不一定按同样比例下降。
-
-## 4.3 SDPA 不等于已经跑了 FlashAttention
-
-### 1. 调用 SDPA 只是进入分派
-
-`scaled_dot_product_attention` 按设备、dtype、头维度、mask、dropout 和当前 PyTorch 构建，在几条后端里选一条。常见的有 FlashAttention 内核、memory-efficient 内核、cuDNN，以及显式的 math 实现。Flash 内核通常要求 CUDA、FP16 或 BF16，以及它支持的头维度。FP32、某些 mask、CPU，都会走到别的实现。所以代码里写了 SDPA，只能说明调用了这个接口。
-
-### 2. 性能没提升时看什么
-
-先分清三件事，证据不要混用。
-
-后端不可用：机器没有 CUDA，或者当前 dtype、头维度、GPU 架构不在 Flash 内核的支持范围里，或者这版 PyTorch 根本没编进该内核。`flash_sdp_enabled()` 一类能力开关是 false，日志里会有不支持的提示。Profiler 里看不到 flash 的 kernel，看到的是 matmul 和 softmax。
-
-执行路径未命中：能力开关是开的，但这一次调用没走进去。dropout、自定义 mask、被 `torch.compile` 拆碎的图，都可能让同一次 SDPA 退回 math 或 memory-efficient。这时要看这次运行的算子名，而不是看开关。命中 Flash 时，记录里应出现 `_scaled_dot_product_flash_attention`、`_flash_attention_forward` 或对应的 `fmha` kernel。没有这些名字，就是没走到。
-
-已命中但收益有限：算子名已经是 Flash 内核，输出也和显式注意力对得上，可是延迟差不多。短序列、小 batch，或者时间主要花在前馈和读 KV 上，都会这样。加速比接近 1，同时 kernel 名已经命中，就属于这一类，而不是没走到。
-
-CPU 上可以先验证分派规则本身：长模式优先匹配，dtype、设备、序列长度、动态形状各自成为拒绝原因，全部后端都不满足时退回 eager，并留下每个后端的拒绝理由。这部分测试已通过，见下方输出。GPU 上的 kernel 名仍然要等有 CUDA 的环境再采。
