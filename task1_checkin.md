@@ -1,9 +1,10 @@
-# Task1 打卡草稿 · 注意力计算与执行分派
+# Task1 打卡 · 注意力计算与执行分派
 
-> 微信群昵称: （请填写）
+> 微信群昵称: （发到群里前补上）
+> GitHub ID: TobinZuo
 > 环境：Mac（本机无 NVIDIA GPU，CPU 机制测试）
 > 系统：macOS
-> AI 占比 vs 人工占比： （请按实际填写）
+> AI 占比 vs 人工占比：80:20
 > 任务项编号 4.1 最小打卡（Part 02 · 04 MHA / GQA，Part 02 · 20 FlashAttention / SDPA）
 > 当前卡点：本机没有 CUDA，4.2 / 4.3 的 GPU 配对实验和 Profiler kernel 证据无法在这台机器上采集。
 
@@ -53,4 +54,4 @@ FlashAttention 仍计算同一种稠密注意力，但按 token 块处理：一�
 - Part 02 · 04：MHA / GQA / MQA 输出形状、因果 mask、KV cache 解码与完整前向末 token 一致、非法 head 配置被拒绝。
 - Part 02 · 20：分块在线 softmax 与完整注意力在非因果、因果、float64 下数值对齐；大分数输出保持有限；固定块大小下局部分数元素数不随序列长度平方增长。
 
-测试输出见 `task1_test_output.txt`。
+测试输出见 `task1_test_output.txt`，截图见 `task1_test_pass.png`。
