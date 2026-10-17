@@ -4,3 +4,6 @@
 ✅ FlashAttention CPU 机制测试通过：数值等价、因果约束、稳定性、工作集代理与输入契约均符合预期。
 MHA: 67108864 bytes = 64 MiB
 GQA: 16777216 bytes = 16 MiB
+
+==================== 02_PyTorch_Algorithms/INF-EXECUTION-DISPATCH_Inference_Fusion_and_Backend_Dispatch.ipynb
+✅ 推理融合与后端分派测试通过：候选、能力门槛和回退均通过。
