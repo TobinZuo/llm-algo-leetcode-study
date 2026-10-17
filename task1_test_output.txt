@@ -1,0 +1,6 @@
+==================== 02_PyTorch_Algorithms/04_Attention_MHA_GQA.ipynb
+✅ Attention 机制测试通过：MHA/GQA/MQA、因果 mask、KV Cache 与参数契约均符合预期。
+==================== 02_PyTorch_Algorithms/20_FlashAttention_Sim.ipynb
+✅ FlashAttention CPU 机制测试通过：数值等价、因果约束、稳定性、工作集代理与输入契约均符合预期。
+MHA: 67108864 bytes = 64 MiB
+GQA: 16777216 bytes = 16 MiB
