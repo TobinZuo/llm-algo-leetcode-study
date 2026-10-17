@@ -54,4 +54,6 @@ FlashAttention 仍计算同一种稠密注意力，但按 token 块处理：一�
 - Part 02 · 04：MHA / GQA / MQA 输出形状、因果 mask、KV cache 解码与完整前向末 token 一致、非法 head 配置被拒绝。
 - Part 02 · 20：分块在线 softmax 与完整注意力在非因果、因果、float64 下数值对齐；大分数输出保持有限；固定块大小下局部分数元素数不随序列长度平方增长。
 
-测试输出见 `task1_test_output.txt`，截图见 `task1_test_pass.png`。
+测试输出见 `task1_test_output.txt`。
+
+![机制测试通过](https://raw.githubusercontent.com/TobinZuo/llm-algo-leetcode-study/master/task1_test_pass.png)
